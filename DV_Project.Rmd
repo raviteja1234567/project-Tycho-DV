@@ -1,0 +1,280 @@
+---
+title: "DV_Project"
+author: "Anumula Naga Raviyeja"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Data Visualization
+Mat no - 12200983
+email - raviteja.anumula-naga@stud.th-deg.de
+Anumula Naga Raviteja
+
+Installing Packages
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(forcats)
+library(hrbrthemes)
+library(viridis)
+library(plotly)
+library(usmap)
+library(tm)
+library(maps)
+```
+
+Exploratory Data Analysis
+
+1. Importing the three vector borne diseases datasets:
+```{r Importing Data}
+DengueDF <- read.csv('US.38362002.csv')
+MalariaDF <- read.csv('US.61462000.csv')
+WestNileDF <- read.csv('US.430397002.csv')
+```
+
+Head of the datasets:
+```{r First 6 rows of data}
+head(DengueDF)
+head(MalariaDF)
+head(WestNileDF)
+```
+
+Structure of the datasets:
+Since all the data is from Tycho the structure of the three datasets are similar, so let's see the structure of one dataset.
+```{r Structure of data}
+str(DengueDF)
+```
+
+Importing USA flood data and population data:
+```{r Flood and Population}
+FloodData <- read_csv("USAFloodReport.csv")
+populationDF <- read_csv('PopulationUS.csv')
+str(FloodData)
+str(populationDF)
+```
+
+
+2. Cleaning and Processing the Data:
+  * Selecting the relevant columns
+  * Formatting the date to get the specific year and selecting the 5 years time period. That is      2013 -2015
+  * Renaming the columns for meaningful interpretation
+  * Dropping the 'NA' rows
+  
+For Dengue Data set
+```{r Cleaning Dengue Dataset}
+DengueDF <- DengueDF[c('Admin1Name','Admin1ISO','PeriodStartDate','CountValue')] 
+DengueDF$PeriodStartDate <- strtrim(DengueDF$PeriodStartDate, 4)
+DengueDF$Admin1ISO <- gsub("US-","",as.character(DengueDF$Admin1ISO))
+DengueDF <- DengueDF[DengueDF$PeriodStartDate >= "2013" & DengueDF$PeriodStartDate <= "2017",] %>% drop_na()
+DengueDF <- setNames(aggregate(DengueDF$CountValue,by=list(DengueDF$Admin1Name,DengueDF$Admin1ISO,DengueDF$PeriodStartDate), FUN=sum), c("StateName","state","Year","Cases"))
+```
+
+For Malaria Data set
+```{r Cleaning Malaria Dataset}
+MalariaDF <- MalariaDF[c('Admin1Name','Admin1ISO','PeriodStartDate','CountValue')] 
+MalariaDF$PeriodStartDate <- strtrim(MalariaDF$PeriodStartDate, 4)
+MalariaDF$Admin1ISO <- gsub("US-","",as.character(MalariaDF$Admin1ISO))
+MalariaDF <- MalariaDF[MalariaDF$PeriodStartDate >= "2013" & MalariaDF$PeriodStartDate <= "2017",] %>% drop_na()
+MalariaDF <- setNames(aggregate(MalariaDF$CountValue,by=list(MalariaDF$Admin1Name,MalariaDF$Admin1ISO,MalariaDF$PeriodStartDate), FUN=sum), c("StateName","state","Year","Cases"))
+```
+
+For West Nile Virus Data set
+```{r West Nile Virus Dataset}
+WestNileDF <- WestNileDF[c('Admin1Name','Admin1ISO','PeriodStartDate','CountValue')] 
+WestNileDF$PeriodStartDate <- strtrim(WestNileDF$PeriodStartDate, 4)
+WestNileDF$Admin1ISO <- gsub("US-","",as.character(WestNileDF$Admin1ISO))
+WestNileDF <- WestNileDF[WestNileDF$PeriodStartDate >= "2013" & WestNileDF$PeriodStartDate <= "2017",] %>% drop_na()
+WestNileDF <- setNames(aggregate(WestNileDF$CountValue,by=list(WestNileDF$Admin1Name,WestNileDF$Admin1ISO,WestNileDF$PeriodStartDate), FUN=sum), c("StateName","state","Year","Cases"))
+```
+
+Removing States which are outside of USA
+```{r Subset}
+DengueDF <- subset(DengueDF, StateName!="WYOMING" & StateName!="GUAM" & StateName!="DISTRICE OF COLUMBIA" & StateName!="SOUTH DAKOTA" & StateName !="PUERTO RICO")
+
+MalariaDF <- subset(MalariaDF, StateName!="WYOMING" & StateName!="GUAM" & StateName!="DISTRICE OF COLUMBIA" & StateName!="SOUTH DAKOTA" & StateName !="PUERTO RICO")
+
+WestNileDF <- subset(WestNileDF, StateName!="WYOMING" & StateName!="GUAM" & StateName!="DISTRICE OF COLUMBIA" & StateName!="SOUTH DAKOTA" & StateName !="PUERTO RICO")
+```
+
+For Flood Data Set
+```{r Cleaning and Processing Flood Dataset}
+FloodData <- setNames(FloodData[c(1,8)],c("state","Year"))
+FloodDataDF <- as.data.frame(FloodData)
+FloodDataDF$Year<-as.character(FloodDataDF$Year)
+FloodDataDF$IsFlooded <- "Yes"
+```
+
+For Population Data Set
+```{r Cleaning and Processing Population Dataset}
+populationDF <- populationDF[c(1,7,8,9,10,11)]
+populationDF <- setNames(cbind(populationDF[1],stack(populationDF[2:6])),c("State","Population","Year"))
+populationDF$State <- toupper(populationDF$State)
+```
+
+
+3. Visualizing the Data
+  * Choropleth map of the vector borne diseases using usmap
+```{r Dengue USA map}
+DengueCases <- DengueDF[c(1,4)]
+DengueCases <- setNames(aggregate(DengueCases$Cases,by=list(DengueCases$StateName), FUN=sum), c("state","Cases"))
+plot_usmap(data = DengueCases, values = "Cases", color = "#0058F5",labels = TRUE) + 
+  scale_fill_continuous(low = "white", high = "#0058F5", name = "Number of Cases", label = scales::comma)+
+  labs(title = "Dengue Cases over the years 2013-2017") + 
+  theme(panel.background=element_blank())
+```
+
+```{r Malaria USA map}
+MalariaCases <- MalariaDF[c(1,4)]
+MalariaCases <- setNames(aggregate(MalariaCases$Cases,by=list(MalariaCases$StateName), FUN=sum), c("state","Cases"))
+plot_usmap(data = MalariaCases, values = "Cases", color = "#0058F5",labels = TRUE) + 
+  scale_fill_continuous(low = "white", high = "#0058F5", name = "Number of Cases", label = scales::comma)+
+  labs(title = "Malaria Cases over the years 2013-2017") + 
+  theme(panel.background=element_blank())
+```
+
+```{r West Nile Virus USA map}
+WestNileCases <- WestNileDF[c(1,4)]
+WestNileCases <- setNames(aggregate(WestNileCases$Cases,by=list(WestNileCases$StateName), FUN=sum), c("state","Cases"))
+plot_usmap(data = WestNileCases, values = "Cases", color = "#0058F5",labels = TRUE) + 
+  scale_fill_continuous(low = "white", high = "#0058F5", name = "Number of Cases", label = scales::comma)+
+  labs(title = "West Nile Virus Cases over the years 2013-2017") + 
+  theme(panel.background=element_blank())
+```
+
+  * Box Plot and Multiple Bar Plot with respect to all 3 vector borne diseases
+```{r Merging vector borene diseases data set}
+mal <- setNames(MalariaDF[c(3,4)],c("Year","MalariaCases"))
+den <- setNames(DengueDF[c(3,4)],c("Year","DengueCases"))
+wnv <- setNames(WestNileDF[c(3,4)],c("Year","WestNileCases"))
+mal <- setNames(aggregate(mal$MalariaCases,by=list(mal$Year), FUN = sum), c("Year","Malaria"))
+den <- setNames(aggregate(den$DengueCases,by=list(den$Year), FUN = sum), c("Year","Dengue"))
+wnv <- setNames(aggregate(wnv$WestNileCases,by=list(wnv$Year), FUN = sum), c("Year","WestNileVirus"))
+#put all data frames into list
+MalDen <- right_join(den,mal,by = "Year") 
+dftest <- right_join(MalDen,wnv,by = "Year")
+CombinedDF = dftest[,c(1,2,3,4)] %>% pivot_longer(c(2,3,4),names_to = 'Disease')
+```
+
+```{r Box Plot}
+ggplot(data = CombinedDF, aes(x=Disease,y=value, color=Disease)) + 
+  geom_boxplot()+
+  scale_fill_brewer(palette="Green") + 
+  geom_jitter(shape=16, position=position_jitter(0.2))+
+  labs(title = 'Dengue VS Malaria VS West Nile Virus',
+       y='Cases',x='Disease')
+```
+  
+```{r Grouped Bar Plot}
+ggplot(data = CombinedDF, aes(x=Year, y=value, fill=Disease )) +
+ geom_bar(stat = "identity", position = "dodge") +
+ theme_ipsum() + # Arial Narrow
+  scale_fill_ipsum() +
+  labs(title = 'Dengue VS Malaria VS West Nile Virus',
+       y='Cases',x='Year')
+```
+
+  * Grouped bar plot with respect to Floods
+```{r Merging Dengue data with Flood data}
+DengueDF$Year<-as.character(DengueDF$Year)
+FloodVsDengueDF <- right_join(FloodDataDF,DengueDF,by=c("state"="StateName","Year"="Year"))
+FloodVsDengueDF <- FloodVsDengueDF[c(1,2,3,5)]
+FloodVsDengueDF <- distinct(FloodVsDengueDF)
+FloodVsDengueDF[is.na(FloodVsDengueDF)] <- "No"
+```
+
+```{r Dengue VS Flood Bar plot, fig.width=12, fig.height=6.5}
+ggplot(data = FloodVsDengueDF, aes(x=state, y=Cases, fill=IsFlooded )) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 1, hjust = 1))+
+  labs(title = "Floods impact on Dengue disease")+
+    facet_wrap(~Year,nrow = 5)
+```
+
+```{r Merging Malaria data with Flood data}
+MalariaDF$Year<-as.character(MalariaDF$Year)
+FloodVsMalariaDF <- right_join(FloodDataDF,MalariaDF,by=c("state"="StateName","Year"="Year"))
+FloodVsMalariaDF <- FloodVsMalariaDF[c(1,2,3,5)]
+FloodVsMalariaDF <- distinct(FloodVsMalariaDF)
+FloodVsMalariaDF[is.na(FloodVsMalariaDF)] <- "No"
+```
+
+```{r Malaria VS Flood Bar plot, fig.width=12, fig.height=6.5}
+ggplot(data = FloodVsMalariaDF, aes(x=state, y=Cases, fill=IsFlooded )) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 1, hjust = 1))+
+  labs(title = "Floods impact on Malaria disease")+
+    facet_wrap(~Year,nrow = 5)
+```
+
+```{r Merging West Nile Virus data with Flood data}
+WestNileDF$Year<-as.character(WestNileDF$Year)
+FloodVsWestNileDF <- right_join(FloodDataDF,WestNileDF,by=c("state"="StateName","Year"="Year"))
+FloodVsWestNileDF <- FloodVsWestNileDF[c(1,2,3,5)]
+FloodVsWestNileDF <- distinct(FloodVsWestNileDF)
+FloodVsWestNileDF[is.na(FloodVsWestNileDF)] <- "No"
+```
+
+```{r West Nile Virus VS Flood Bar plot, fig.width=12, fig.height=6.5}
+ggplot(data = FloodVsWestNileDF, aes(x=state, y=Cases, fill=IsFlooded )) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 1, hjust = 1))+
+  labs(title = "Floods impact on West Nile Virus disease")+
+    facet_wrap(~Year,nrow = 5)
+```
+
+  * Bubble plot with respect to population
+```{r Merging Dengue and Population Data}
+DengueDF$State <- toupper(DengueDF$State)
+PopAndDengueDF <- right_join(populationDF,DengueDF,by=c("State"="StateName","Year"="Year")) %>% na.omit()
+PopAndDengueDF <- PopAndDengueDF[,-c(6)]
+```
+
+```{r Bubble plot of Dengue VS Population, fig.width=10}
+PopAndDengueDF %>%
+  arrange(desc(Population)) %>%
+#  mutate(state = factor(state, state)) %>%
+  ggplot(aes(x=State, y=Cases, size=Population, color=Year)) +
+    geom_point(alpha=0.5) +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 1, hjust = 1))+
+  labs(title = "Population Vs Dengue")+
+    scale_size(range = c(.1, 24), name="Population")
+```
+
+```{r Merging Malaria and Population Data}
+
+PopAndMalDF <- right_join(populationDF,MalariaDF,by=c("State"="StateName","Year"="Year")) %>% na.omit()
+PopAndMalDF <- PopAndMalDF[,-c(6)]
+```
+
+```{r Bubble plot of Malaria VS Population, fig.width=10}
+PopAndMalDF %>%
+  arrange(desc(Population)) %>%
+#  mutate(state = factor(state, state)) %>%
+  ggplot(aes(x=State, y=Cases, size=Population, color=Year)) +
+    geom_point(alpha=0.5) +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 1, hjust = 1))+
+  labs(title = "Population Vs Malaria")+
+    scale_size(range = c(.1, 24), name="Population")
+```
+
+```{r Merging West Nile Virus and Population Data}
+
+PopAndWNVDF <- right_join(populationDF,WestNileDF,by=c("State"="StateName","Year"="Year")) %>% na.omit()
+PopAndWNVDF <- PopAndWNVDF[,-c(6)]
+```
+
+```{r Bubble plot of West Nile Virus VS Population, fig.width=10}
+PopAndWNVDF %>%
+  arrange(desc(Population)) %>%
+#  mutate(state = factor(state, state)) %>%
+  ggplot(aes(x=State, y=Cases, size=Population, color=Year)) +
+    geom_point(alpha=0.5) +
+  theme(axis.text.x = element_text(angle = 45, size = 8, vjust = 1, hjust = 1))+
+  labs(title = "Population Vs West Nile Virus")+
+    scale_size(range = c(.1, 24), name="Population (M)")
+```
